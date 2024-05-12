@@ -26,6 +26,7 @@ This project implements a holistic chat application consisting of a GUI frontend
 - Implement real-time functionality without blocking the GUI.
 - Handle parallel access to the database structure (e.g., concurrent search and message sending).
 
+
 ## Folder Structure
 - **client/**: Contains files related to the GUI client application.
 - **server/**: Contains files related to the backend server application.
@@ -56,4 +57,5 @@ This project implements a holistic chat application consisting of a GUI frontend
 3. Enter login credentials.
 4. Select a user to start a chat.
 5. Send and receive messages.
+
 
