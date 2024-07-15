@@ -4,22 +4,6 @@ from tkinter import ttk
 import socket
 import threading
 
-# THINGS TO IMPROVE IN THE FUTURE:
-
-
-# Not allowing user to make multiple instances of the same chat
-# Registering page (right now we need to manually change the variables)
-# Remembering the previous chat history
-# Remembering previous chat users, friends list
-# A way to leave the app without forcing the closure of the program (we haven't utilized the client.disconnect in any way nor we don't have a quit button)
-# Make the app accessible even if it's not connected (now it just doesn't appear when there is no connection to the server)
-# Maybe better UI?
-
-# TO TEST:
-
-# Multiple chats with multiple clients at the same time (we don't have the resources to test that, it was only tested with 2 clients for now)
-
-
 
 class Client:
     def __init__(self, host, port):
@@ -34,8 +18,8 @@ class Client:
         messinfo = f"{mess}|{user}|{sender}"
         self.s.send(messinfo.encode('utf-8'))
 
-    def send_login(self, username, password):
-        login_info = f"{username}+{password}"
+    def send_login(self, username):
+        login_info = f"{username}"
         self.s.send(login_info.encode('utf-8'))
 
     def receive_message(self):
@@ -48,20 +32,57 @@ class Client:
     def disconnect(self):
         self.s.close()
 
+
 class GUI:
-    def __init__(self, login_info):
+    def __init__(self):
         self.root = tk.Tk()
         self.root.title("ChatApp")
-        self.login_info = login_info
         self.notebook = ttk.Notebook(self.root)
         self.notebook.pack(fill=tk.BOTH, expand=True)
 
-        self.client = Client('192.168.0.112', 8001)  # Update the IP address to your server's IP
-        self.client.connect()
 
-        self.login_page()
-        self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
+        self.conversations = []
+
+        self.connection_page()
         self.root.mainloop()
+
+    def connection_page(self):
+        self.connection_frame = tk.Frame(self.notebook)
+        self.notebook.add(self.connection_frame, text="Connect")
+
+        self.ip_label = tk.Label(self.connection_frame, text="IP Address:")
+        self.ip_label.pack()
+        self.ip_entry = tk.Entry(self.connection_frame)
+        self.ip_entry.pack()
+
+        self.port_label = tk.Label(self.connection_frame, text="Port:")
+        self.port_label.pack()
+        self.port_entry = tk.Entry(self.connection_frame)
+        self.port_entry.pack()
+
+        self.connect_button = tk.Button(self.connection_frame, text="Connect", command=self.check_connection)
+        self.connect_button.pack()
+        self.ip_entry.bind('<Return>', lambda event: self.check_connection())
+        self.port_entry.bind('<Return>', lambda event: self.check_connection())
+
+    def check_connection(self):
+        ip_address = self.ip_entry.get()
+        port = self.port_entry.get()
+        try:
+            port = int(port)
+            if not (0 <= port <= 65535):
+                raise ValueError("Port out of range")
+
+            self.client = Client(ip_address, port)
+            self.client.connect()
+
+            messagebox.showinfo("Connection Successful", f"Connected to {ip_address}:{port}")
+            self.notebook.forget(self.connection_frame)
+            self.login_page()
+        except ValueError:
+            messagebox.showerror("Invalid Input", "Please enter a valid IP address and port number")
+        except socket.error as e:
+            messagebox.showerror("Connection Failed", f"Failed to connect to {ip_address}:{port}\nError: {e}")
 
     def login_page(self):
         self.login_frame = tk.Frame(self.notebook)
@@ -71,25 +92,20 @@ class GUI:
         self.username_label.pack()
         self.username_entry = tk.Entry(self.login_frame)
         self.username_entry.pack()
-        self.password_label = tk.Label(self.login_frame, text="Password:")
-        self.password_label.pack()
-        self.password_entry = tk.Entry(self.login_frame, show="*")
-        self.password_entry.pack()
 
-        self.login_button = tk.Button(self.login_frame, text="Login", command=self.login)
+        self.login_button = tk.Button(self.login_frame, text="Login", command=self.check_login)
         self.login_button.pack()
-        self.username_entry.bind('<Return>', lambda event: self.login())
-        self.password_entry.bind('<Return>', lambda event: self.login())
+        self.username_entry.bind('<Return>', lambda event: self.check_login())
 
-    def login(self):
+    def check_login(self):
         self.username = self.username_entry.get()
-        self.password = self.password_entry.get()
-        if self.username == self.login_info['username'] and self.password == self.login_info['password']:
-            self.client.send_login(self.username, self.password)
+        if not isinstance(self.username, str) or ' ' in self.username.strip() or not self.username.strip():
+            messagebox.showerror("Login Failed", "Invalid username.")
+        else:
+            self.client.send_login(self.username)
             self.notebook.forget(self.login_frame)
             self.user_chat_window()
-        else:
-            messagebox.showerror("Login Failed", "Invalid username or password")
+
 
     def user_chat_window(self):
         self.user_selection_frame = ttk.Frame(self.notebook)
@@ -108,12 +124,17 @@ class GUI:
     def start_chat(self):
         username = self.username_entry.get().strip()
         if username:
-            chat_frame = ttk.Frame(self.notebook)
-            self.notebook.add(chat_frame, text=username)
-            self.inside_chat(chat_frame, username)
-            self.notebook.select(chat_frame)
+            if username in self.conversations:
+                messagebox.showerror("Error", "This conversation already exists")
+            else:
+                self.conversations.append(username)
+                chat_frame = ttk.Frame(self.notebook)
+                self.notebook.add(chat_frame, text=username)
+                self.inside_chat(chat_frame, username)
+                self.notebook.select(chat_frame)
         else:
             messagebox.showerror("Error", "Please enter a username to start chat")
+        return username
 
     def inside_chat(self, chat_frame, user):
         chat_text = tk.Text(chat_frame, state=tk.DISABLED)
@@ -121,7 +142,8 @@ class GUI:
 
         message_entry = tk.Entry(chat_frame)
         message_entry.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
-        send_button = tk.Button(chat_frame, text="Send", command=lambda: self.send_message(message_entry, chat_text, user))
+        send_button = tk.Button(chat_frame, text="Send",
+                                command=lambda: self.send_message(message_entry, chat_text, user))
         send_button.pack(side=tk.BOTTOM)
         message_entry.bind('<Return>', lambda event: self.send_message(message_entry, chat_text, user))
         threading.Thread(target=self.receive_message, args=(chat_text, user)).start()
@@ -143,11 +165,11 @@ class GUI:
                 chat_text.insert(tk.END, f"{user}: {message}\n")
                 chat_text.config(state=tk.DISABLED)
 
-# proper client disconnection handling with a window close
     def on_closing(self):
         self.client.disconnect()
         self.root.destroy()
 
-if __name__ == "__main__":
-    login_info = {'username': 'a', 'password': 'a'}
-    app = GUI(login_info)
+
+
+
+app = GUI()
