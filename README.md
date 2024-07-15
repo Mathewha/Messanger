@@ -59,3 +59,10 @@ This project implements a holistic chat application consisting of a GUI frontend
 5. Send and receive messages.
 
 
+## Future Improvements 
+0. creating an option and front_end development for letting the user creat his own user_name and password  
+1. data base file (where we can store all the chat history )
+2. data base file (where we can store all users data login (user_name , password ))
+3. make exe file from both
+
+
