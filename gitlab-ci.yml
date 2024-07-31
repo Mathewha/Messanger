@@ -1,0 +1,29 @@
+stages:
+  - test
+  - build
+
+pytest:
+  stage: test
+  image: python:3.9-alpine  
+  script:
+    - pytest
+  tags:
+    - shell
+
+build_executable:
+  stage: build
+  image: python:3.9-alpine  
+  script:
+    - python3 -m venv venv  
+    - source venv/bin/activate  
+    - pip install --upgrade pyinstaller  
+    - pyinstaller --onefile --console server.py
+    - pyinstaller --onefile GUI.py
+  tags:
+    - shell
+  artifacts:
+    paths:
+      - build/
+      - dist/ 
+    when: always
+
